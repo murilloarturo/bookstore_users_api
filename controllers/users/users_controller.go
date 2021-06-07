@@ -1,7 +1,6 @@
 package users
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -13,7 +12,6 @@ import (
 
 func GetUser(c *gin.Context) {
 	userId, userErr := strconv.ParseInt(c.Param("user_id"), 10, 64)
-	fmt.Println("PRUBAAA", userId)
 	if userErr != nil {
 		reqErr := errors.NewBadRequestError("invalid user id")
 		c.JSON(reqErr.Status, reqErr)
@@ -25,7 +23,7 @@ func GetUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusFound, result)
+	c.JSON(http.StatusOK, result)
 }
 
 func CreateUser(c *gin.Context) {
@@ -56,4 +54,29 @@ func CreateUser(c *gin.Context) {
 
 func SearchUser(c *gin.Context) {
 	c.String(http.StatusNotImplemented, "Implement Search!")
+}
+
+func UpdateUser(c *gin.Context) {
+	userId, userErr := strconv.ParseInt(c.Param("user_id"), 10, 64)
+	if userErr != nil {
+		reqErr := errors.NewBadRequestError("invalid user id")
+		c.JSON(reqErr.Status, reqErr)
+		return
+	}
+	var user users.User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		restErr := errors.NewBadRequestError("Invalid json body")
+		c.JSON(restErr.Status, restErr)
+		return
+	}
+	user.Id = userId
+
+	isPartial := c.Request.Method == http.MethodPatch 
+	result, err := services.UpdateUser(isPartial, user)
+	if err != nil {
+		c.JSON(err.Status, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
