@@ -2,10 +2,16 @@ package users
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/murilloarturo/bookstore_users_api/datasources/mysql/users_db"
 	"github.com/murilloarturo/bookstore_users_api/utils/date"
 	"github.com/murilloarturo/bookstore_users_api/utils/errors"
+)
+
+const (
+	uniqueEmailCode = "email_UNIQUE"
+	insertUserQuery = "INSERT INTO users(first_name, last_name, email, date_created) VALUES(?, ?, ?, ?);"
 )
 
 var (
@@ -30,14 +36,29 @@ func (u *User) Get() *errors.RestErr {
 	return nil
 }
 
-func (u *User) Save() *errors.RestErr {
-	current := usersDB[u.Id]
-	if current != nil {
-		return errors.NewBadRequestError(fmt.Sprintf("user %d already exists", u.Id))
+func (user *User) Save() *errors.RestErr {
+	stmt, err := users_db.Client.Prepare(insertUserQuery)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
 	}
-	u.DateCreated = date.GetNowString()
+	defer stmt.Close()
 
-	usersDB[u.Id] = u
-
+	user.DateCreated = date.GetNowString()
+	// other way to do this
+	// result, err := users_db.Client.Exec(insertUserQuery, user.FirstName, user.LastName, user.Email, user.DateCreated)
+	// is better to prepare the statement, so the system returns an error when the query is invalid
+	// also has better performance
+	insertResult, err := stmt.Exec(user.FirstName, user.LastName, user.Email, user.DateCreated)
+	if err != nil {
+		if strings.Contains(err.Error(), uniqueEmailCode) {
+			return errors.NewBadRequestError(fmt.Sprintf("email %s already exists", user.Email))
+		}
+		return errors.NewInternalServerError(fmt.Sprintf("error when trying to save user : %s", err.Error()))
+	}
+	userId, err := insertResult.LastInsertId()
+	if err != nil {
+		return errors.NewInternalServerError(fmt.Sprintf("error when trying to save user: %s", err.Error()))
+	}
+	user.Id = userId
 	return nil
 }

@@ -32,10 +32,12 @@ func init() {
 		host,
 		schema,
 	)
-	Client, err := sql.Open("mysql", datasourceName)
+	var err error
+	Client, err = sql.Open("mysql", datasourceName)
 	if err != nil {
 		panic(err)
 	}
+
 	if err = Client.Ping(); err != nil {
 		panic(err)
 	}

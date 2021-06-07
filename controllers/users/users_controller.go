@@ -1,6 +1,7 @@
 package users
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -12,6 +13,7 @@ import (
 
 func GetUser(c *gin.Context) {
 	userId, userErr := strconv.ParseInt(c.Param("user_id"), 10, 64)
+	fmt.Println("PRUBAAA", userId)
 	if userErr != nil {
 		reqErr := errors.NewBadRequestError("invalid user id")
 		c.JSON(reqErr.Status, reqErr)
