@@ -2,18 +2,21 @@ package users
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/murilloarturo/bookstore_users_api/datasources/mysql/users_db"
 	"github.com/murilloarturo/bookstore_users_api/logger"
 	"github.com/murilloarturo/bookstore_users_api/utils/errors"
+	"github.com/murilloarturo/bookstore_users_api/utils/mysql_utils"
 )
 
 const (
-	insertUserQuery = "INSERT INTO users(first_name, last_name, email, date_created, status, password) VALUES(?, ?, ?, ?, ?, ?);"
-	getUserQuery    = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE id=?;"
-	updateUserQuery = "UPDATE users SET first_name=?, last_name=?, email=?;"
-	deleteUserQuery = "DELETE FROM users WHERE id=?;"
-	findUserQuery   = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE status=?;"
+	insertUserQuery             = "INSERT INTO users(first_name, last_name, email, date_created, status, password) VALUES(?, ?, ?, ?, ?, ?);"
+	getUserQuery                = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE id=?;"
+	updateUserQuery             = "UPDATE users SET first_name=?, last_name=?, email=?;"
+	deleteUserQuery             = "DELETE FROM users WHERE id=?;"
+	findByStatusQuery           = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE status=?;"
+	findByEmailAndPasswordQuery = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE email=? AND password=? AND status=?;"
 )
 
 func (user *User) Get() *errors.RestErr {
@@ -97,7 +100,7 @@ func (user *User) Delete() *errors.RestErr {
 }
 
 func (user *User) FindByStatus(status string) ([]User, *errors.RestErr) {
-	stmt, err := users_db.Client.Prepare(findUserQuery)
+	stmt, err := users_db.Client.Prepare(findByStatusQuery)
 	if err != nil {
 		logger.Error("error when trying to prepare find user by status statement", err)
 		return nil, errors.NewInternalServerError("database error")
@@ -126,4 +129,24 @@ func (user *User) FindByStatus(status string) ([]User, *errors.RestErr) {
 	} else {
 		return results, nil
 	}
+}
+
+func (user *User) FindByEmailAndPassword() *errors.RestErr {
+	stmt, err := users_db.Client.Prepare(findByEmailAndPasswordQuery)
+	if err != nil {
+		logger.Error("error when trying to prepare find user by email and password statement", err)
+		return errors.NewInternalServerError("database error")
+	}
+	defer stmt.Close()
+
+	result := stmt.QueryRow(user.Email, user.Password, ActiveStatus)
+	if getErr := result.Scan(&user.Id, &user.FirstName, &user.LastName, &user.Email, &user.DateCreated, &user.Status); getErr != nil {
+		logger.Error("error when trying to get user by email and password", getErr)
+		if strings.Contains(getErr.Error(), mysql_utils.NoRowsErrorCode) {
+			return errors.NewNotFoundError("invalid user credentials")
+		}
+		return errors.NewInternalServerError("database error")
+	}
+
+	return nil
 }
